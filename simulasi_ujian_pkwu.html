@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulasi Ujian PKWU - Eye Care Mode</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Inter"', 'system-ui', 'sans-serif'],
+                        serif: ['"Merriweather"', 'Georgia', 'serif'],
+                    },
+                    colors: {
+                        paper: {
+                            bg: '#EFECE5',      // Latar belakang utama (krem debu)
+                            card: '#FBFaf8',    // Warna kartu soal (krem sangat terang)
+                            text: '#413F39',    // Teks utama (abu-abu kecoklatan, bukan hitam murni)
+                            muted: '#8C8981',   // Teks redup
+                            border: '#E0DDD4'   // Garis batas lembut
+                        },
+                        sage: {
+                            DEFAULT: '#899481', // Hijau sage utama (fokus)
+                            hover: '#737C6C',
+                            light: '#DCE0D9',
+                            bg: '#F2F4F0'
+                        },
+                        correct: {
+                            DEFAULT: '#8FA68F', // Hijau redup
+                            bg: '#F0F5F0',
+                            border: '#C2D1C2'
+                        },
+                        wrong: {
+                            DEFAULT: '#C49797', // Merah bata/rose redup
+                            bg: '#FAF0F0',
+                            border: '#E6CACA'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { 
+            background-color: #EFECE5; 
+            color: #413F39; 
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+        /* Custom scrollbar estetik */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #DCE0D9; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #899481; }
+        
+        .fade-in { animation: fadeIn 0.4s ease-in-out; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // --- ICONS ---
+        const IconLeaf = () => <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg>;
+        const IconHelp = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>;
+        const IconChevronLeft = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>;
+        const IconChevronRight = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>;
+        const IconRefresh = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>;
+
+        // --- FULL DATA SOAL 45 BUTIR (Berdasarkan Kisi-Kisi & PDF Materi) ---
+        const QUESTIONS = [
+            {
+                id: 1, type: 'mcq', level: 'C1', materi: 'Limbah',
+                kisi: 'Menjelaskan pengertian limbah',
+                question: 'Sisa hasil produksi atau kegiatan manusia yang sudah tidak memiliki nilai ekonomi atau manfaat langsung disebut...',
+                options: ['Polusi udara', 'Limbah', 'Bahan baku', 'Kerajinan', 'Kompos'],
+                answer: 1,
+                clue: 'Pikirkan konsep sisa buangan yang dihasilkan dari aktivitas harian atau industri yang awalnya tidak langsung digunakan kembali sebelum diolah.',
+                explanation: 'Berdasarkan Halaman 1 materi PDF: LIMBAH adalah sisa hasil produksi atau kegiatan manusia yang sudah tidak memiliki nilai ekonomi atau manfaat langsung.'
+            },
+            {
+                id: 2, type: 'mcq', level: 'C2', materi: 'Limbah Bangun Ruang',
+                kisi: 'Mengidentifikasi ciri limbah berbentuk bangun ruang',
+                question: 'Karakteristik utama dari limbah berbentuk bangun ruang dibandingkan limbah bangun datar adalah...',
+                options: [
+                'Hanya memiliki dimensi panjang dan lebar',
+                'Berwujud gas dan mudah menguap',
+                'Memiliki volume atau keruangan sehingga dapat berdiri',
+                'Mudah terurai di dalam tanah secara alami',
+                'Selalu berasal dari sisa makanan dan daun kering'
+                ],
+                answer: 2,
+                clue: 'Limbah jenis ini memiliki dimensi tiga dimensi (3D) dan menempati suatu ruang.',
+                explanation: 'Berdasarkan Halaman 1 materi PDF: Limbah Berbentuk Bangun Ruang adalah limbah yang berbentuk bangun berdimensi tiga yang memiliki volume sehingga dapat berdiri.'
+            },
+            {
+                id: 3, type: 'mcq', level: 'C2', materi: 'Limbah Anorganik',
+                kisi: 'Mengidentifikasi pemanfaatan botol plastik bekas',
+                question: 'Botol plastik bekas merupakan limbah anorganik yang sulit terurai. Salah satu pemanfaatan botol plastik menjadi benda yang bernilai guna adalah...',
+                options: [
+                'Dibakar untuk menghilangkan wujudnya',
+                'Ditimbun di dalam tanah untuk menyuburkan tanaman',
+                'Diolah menjadi kerajinan seperti pot tanaman atau wadah pensil',
+                'Dibuang ke sungai agar hancur oleh aliran air',
+                'Dihancurkan menjadi bahan baku pakan ternak'
+                ],
+                answer: 2,
+                clue: 'Carilah opsi yang mengubah limbah menjadi produk pakai/hias tanpa merusak lingkungan atau membakar zat plastik berbahaya.',
+                explanation: 'Berdasarkan Halaman 4 & 5 materi PDF: Salah satu bentuk pemanfaatan botol plastik bekas secara positif adalah diolah menjadi benda pakai seperti tempat pensil atau pot tanaman.'
+            },
+            {
+                id: 4, type: 'mcq', level: 'C2', materi: 'Limbah Gas',
+                kisi: 'Mengidentifikasi limbah berdasarkan bentuknya',
+                question: 'Asap kendaraan bermotor, asap pabrik, dan pembakaran sampah yang dapat menyebabkan pemanasan global merupakan kelompok limbah berdasarkan wujudnya, yaitu...',
+                options: ['Limbah cair', 'Limbah padat', 'Limbah organik', 'Limbah gas', 'Limbah domestik'],
+                answer: 3,
+                clue: 'Sifatnya tidak terlihat secara kasat mata penuh, mudah tersebar secara bebas di udara, dan terakumulasi di atmosfer.',
+                explanation: 'Berdasarkan Halaman 1 materi PDF: Limbah Gas adalah sisa buangan berbentuk gas yang dilepaskan ke udara. Contohnya: asap kendaraan bermotor, asap pabrik, pembakaran sampah.'
+            },
+            {
+                id: 5, type: 'mcq', level: 'C4', materi: 'Limbah Cair',
+                kisi: 'Menganalisis dampak limbah cair terhadap lingkungan',
+                question: 'Air sabun bekas cucian dan limbah pabrik yang dibuang langsung ke sungai tanpa diolah akan menimbulkan dampak kerusakan lingkungan. Analisis dampak paling signifikan dari limbah cair tersebut adalah...',
+                options: [
+                'Meningkatkan kadar oksigen terlarut dalam air',
+                'Mencemari sumber air bersih dan merusak ekosistem air',
+                'Menjadikan sungai lebih jernih karena bahan kimia pembersih',
+                'Menimbulkan hujan asam di sekitar daerah aliran sungai',
+                'Menyuburkan tanaman gulma air yang bermanfaat'
+                ],
+                answer: 1,
+                clue: 'Limbah cair meresap dan mengalir ke badan perairan. Zat kimianya merusak makhluk hidup di dalam air (ikan, tanaman air).',
+                explanation: 'Berdasarkan Halaman 1 materi PDF: Dampak limbah cair adalah mencemari sumber air bersih, merusak ekosistem air, serta berbahaya bagi kesehatan.'
+            },
+            {
+                id: 6, type: 'mcq', level: 'C2', materi: 'Limbah Anorganik',
+                kisi: 'Mengidentifikasi kelompok limbah anorganik',
+                question: 'Berikut ini yang termasuk dalam kelompok limbah anorganik yang sulit terurai oleh alam adalah...',
+                options: [
+                'Sisa sayuran, kulit buah, dan kotoran hewan',
+                'Jerami, sekam padi, dan sisa makanan',
+                'Plastik, botol kaca, pecahan kaca, dan kaleng',
+                'Kertas, karton, dan daun kering',
+                'Sisa bangkai hewan dan serbuk gergaji kayu'
+                ],
+                answer: 2,
+                clue: 'Limbah anorganik tidak mengandung unsur karbon dan umumnya berasal dari bahan tambang atau hasil pengolahan industri kimia.',
+                explanation: 'Berdasarkan Halaman 1 materi PDF: Contoh limbah anorganik meliputi plastik, botol kaca, pecahan kaca, kaleng, aluminium, dan tas plastik.'
+            },
+            {
+                id: 7, type: 'mcq', level: 'C4', materi: 'Limbah Organik',
+                kisi: 'Menganalisis potensi limbah pertanian',
+                question: 'Daerah pertanian menghasilkan limbah seperti jerami dan sekam padi dalam jumlah besar. Jika dianalisis, potensi pemanfaatan terbaik dari limbah organik ini agar tidak mencemari lingkungan adalah...',
+                options: [
+                'Dijadikan bahan baku pembuatan plastik sintetis',
+                'Didaur ulang menjadi kompos, pakan ternak, atau kerajinan tangan alami',
+                'Dibuang ke selokan agar cepat terurai oleh air mengalir',
+                'Dibakar di lahan terbuka agar abu sisa pembakaran dapat dijual',
+                'Disimpan di dalam gudang tanpa batas waktu'
+                ],
+                answer: 1,
+                clue: 'Limbah pertanian bersifat organik (mengandung unsur karbon) sehingga mudah membusuk dan sangat baik diolah menjadi penyubur tanah atau pakan alami.',
+                explanation: 'Berdasarkan Halaman 1 & 5 materi PDF: Limbah pertanian seperti jerami dan sekam banyak mengandung bahan organik yang berpotensi didaur ulang menjadi pupuk kompos atau kerajinan alami.'
+            },
+            {
+                id: 8, type: 'mcq', level: 'C2', materi: 'Limbah Anorganik',
+                kisi: 'Menjelaskan dampak limbah anorganik',
+                question: 'Dampak jangka panjang yang ditimbulkan apabila limbah anorganik seperti plastik dan kaleng dibuang sembarangan adalah...',
+                options: [
+                'Menjadi tempat berkembang biak bakteri pembusuk dengan cepat',
+                'Menghasilkan gas metana yang menyebabkan ledakan sampah',
+                'Mencemari lingkungan, menyumbat saluran air, dan membutuhkan waktu sangat lama untuk terurai',
+                'Menyuburkan tanah di area tempat pembuangan akhir',
+                'Dapat segera diurai oleh mikroorganisme menjadi unsur hara'
+                ],
+                answer: 2,
+                clue: 'Limbah anorganik bersifat tidak mudah membusuk dan bertahan bertahun-tahun di tanah maupun air.',
+                explanation: 'Berdasarkan Halaman 1 materi PDF: Dampak limbah anorganik adalah mencemari lingkungan jangka panjang, menyumbat saluran air, merusak ekosistem perairan/tanah karena butuh waktu sangat lama untuk terurai.'
+            },
+            {
+                id: 9, type: 'mcq', level: 'C4', materi: 'Daur Ulang',
+                kisi: 'Menganalisis solusi penanganan limbah plastik',
+                question: 'Plastik pembungkus dan styrofoam sangat merusak lingkungan jika tidak dikelola. Berdasarkan prinsip pengelolaan limbah, analisis solusi yang paling berkelanjutan (sustainable) dan bernilai ekonomis adalah...',
+                options: [
+                'Membakar seluruh limbah plastik di insinerator bersuhu rendah',
+                'Mengubur limbah plastik di pekarangan belakang rumah',
+                'Mendaur ulangnya (recycle) menjadi produk kerajinan inovatif yang memiliki nilai jual',
+                'Membuang limbah plastik ke laut agar tenggelam ke dasar',
+                'Membiarkan limbah menumpuk di TPA karena akan terurai sendiri'
+                ],
+                answer: 2,
+                clue: 'Cari metode yang ramah lingkungan sekaligus menciptakan sirkulasi ekonomi (menghasilkan uang/nilai jual tambahan).',
+                explanation: 'Berdasarkan Halaman 2 materi PDF: Pemanfaatan limbah salah satunya adalah didaur ulang (recycle) menjadi kerajinan yang memiliki nilai ekonomis tinggi.'
+            },
+            {
+                id: 10, type: 'mcq', level: 'C2', materi: 'Kerajinan Limbah',
+                kisi: 'Mengidentifikasi limbah yang dapat dijadikan kerajinan',
+                question: 'Bahan limbah berbentuk bangun ruang yang dapat dimanfaatkan untuk membuat kerajinan tempat lampu hias bernilai estetik tinggi adalah...',
+                options: ['Kertas koran bekas', 'Daun pisang kering', 'Plastik kresek', 'Botol kaca atau tempurung kelapa', 'Sisa sayuran rumah tangga'],
+                answer: 3,
+                clue: 'Pilihlah bahan limbah yang memiliki volume (3 dimensi) dan kuat menampung struktur panas lampu serta memiliki sifat bias cahaya menarik.',
+                explanation: 'Berdasarkan Halaman 4 & 5 materi PDF: Lampu hias dari botol kaca atau tempurung kelapa merupakan contoh kerajinan limbah berbentuk bangun ruang.'
+            },
+            {
+                id: 11, type: 'mcq', level: 'C4', materi: 'Peluang Usaha',
+                kisi: 'Menganalisis faktor pemasaran usaha kerajinan',
+                question: 'Dalam merencanakan usaha, faktor pemasaran sangat penting dianalisis sebelum memproduksi kerajinan secara massal. Analisis yang paling mendasar pada faktor pemasaran adalah...',
+                options: [
+                'Menganalisis keterampilan tukang/pengrajin dalam mengolah limbah',
+                'Meneliti kemungkinan pemasaran dan prospek pasar produk di waktu mendatang',
+                'Menentukan tingkat bunga bank untuk pinjaman modal',
+                'Mencari lokasi pembuangan limbah terdekat dari tempat produksi',
+                'Mengurus Izin Mendirikan Bangunan (IMB) untuk pabrik'
+                ],
+                answer: 1,
+                clue: 'Pemasaran berfokus pada target pasar, daya beli konsumen, serta prospek kelangsungan penjualan di masa depan.',
+                explanation: 'Berdasarkan Halaman 2 materi PDF pada bagian Faktor Pemasaran: Harus diteliti kemungkinan pemasaran dan prospek pemasarannya di waktu mendatang.'
+            },
+            {
+                id: 12, type: 'mcq', level: 'C4', materi: 'Peluang Usaha',
+                kisi: 'Menganalisis penguasaan teknis usaha',
+                question: 'Seorang wirausaha ingin memproduksi tas dari limbah tempurung kelapa. Namun usahanya tersendat karena pengrajin kesulitan menyatukan potongan batok kelapa. Kasus ini menunjukkan kurangnya analisis pada faktor...',
+                options: ['Faktor perizinan', 'Faktor modal', 'Faktor penguasaan teknis', 'Faktor bahan baku', 'Faktor persaingan'],
+                answer: 2,
+                clue: 'Masalah ini berkaitan erat dengan proses pembuatan, keahlian para pekerja, serta cara merakit produk dengan benar.',
+                explanation: 'Berdasarkan Halaman 2 materi PDF pada bagian Faktor Penguasaan Teknis: Cara pembuatan produk kerajinan perlu dikuasai atau dipelajari dengan baik oleh para karyawan/pengrajin.'
+            },
+            {
+                id: 13, type: 'mcq', level: 'C4', materi: 'SWOT',
+                kisi: 'Mengidentifikasi ancaman dalam analisis SWOT',
+                question: 'Dalam menjalankan usaha kerajinan hiasan dinding dari limbah kayu, tiba-tiba muncul produk pabrikan impor dengan desain mirip namun harganya jauh lebih murah. Dalam analisis SWOT, kondisi ini diklasifikasikan sebagai...',
+                options: ['Strength (Kekuatan)', 'Weakness (Kelemahan)', 'Opportunity (Peluang)', 'Threat (Ancaman)', 'Target (Sasaran)'],
+                answer: 3,
+                clue: 'Hal ini berasal dari faktor luar (eksternal) perusahaan dan berpotensi menghambat atau merugikan kelangsungan bisnis Anda.',
+                explanation: 'Berdasarkan Halaman 2 materi PDF pada bagian Analisis SWOT: Threat (Ancaman) adalah hal-hal dari luar yang dapat menghambat atau merugikan usaha.'
+            },
+            {
+                id: 14, type: 'mcq', level: 'C4', materi: 'Manajemen Usaha',
+                kisi: 'Menganalisis faktor manajemen usaha',
+                question: 'Wirausaha sering gagal karena tidak mampu membagi tugas karyawan, mengatur jadwal kerja, dan menata administrasi secara rapi. Analisis terhadap kelemahan tersebut menunjukkan perusahaan memiliki kelemahan di bagian...',
+                options: ['Faktor bahan baku', 'Faktor manajemen', 'Faktor perizinan pemerintah', 'Faktor lokasi usaha', 'Faktor penguasaan mesin'],
+                answer: 1,
+                clue: 'Kegiatan pengorganisasian, koordinasi tim, penataan tugas, serta kepemimpinan merupakan inti dari proses ini.',
+                explanation: 'Berdasarkan Halaman 2 materi PDF pada bagian Faktor Manajemen: Pertimbangan penting lainnya adalah produk pengelolaannya (manajemen) yang paling sesuai dan kemampuan pengusaha mengelolanya.'
+            },
+            {
+                id: 15, type: 'mcq', level: 'C2', materi: 'Peluang Usaha',
+                kisi: 'Mengidentifikasi faktor pendukung keberhasilan usaha',
+                question: 'Di bawah ini yang merupakan enam tipe sumber daya utama (6M) sebagai pendukung keberhasilan usaha kerajinan adalah...',
+                options: [
+                'Manusia, Uang, Bahan, Mesin, Metode, dan Pasar (Market)',
+                'Manusia, Bahan, Moral, Media, Mutu, dan Motif',
+                'Metode, Uang, Marketing, Media Sosial, Mitra, dan Mesin',
+                'Modal, Merek, Manajer, Motivasi, Makelar, dan Material',
+                'Manusia, Makna, Mutu, Moral, Mesin, dan Metode'
+                ],
+                answer: 0,
+                clue: 'Ingatlah istilah asli dalam bahasa Inggris: Man, Money, Material, Machine, Method, dan Market.',
+                explanation: 'Berdasarkan Halaman 2 materi PDF pada bagian Sumber Daya yang Dibutuhkan: Meliputi enam tipe sumber daya (Man, Money, Material, Machine, Method, dan Market).'
+            },
+            {
+                id: 16, type: 'mcq', level: 'C2', materi: 'Administrasi Usaha',
+                kisi: 'Mengidentifikasi kegiatan administrasi usaha',
+                question: 'Kegiatan membuat catatan rapi dan kronologis tentang kegiatan usaha harian, pembelian bahan, serta mengurus dokumen perizinan merupakan bagian dari kegiatan...',
+                options: ['Produksi usaha', 'Administrasi usaha', 'Pemasaran produk', 'Promosi digital', 'Desain kemasan'],
+                answer: 1,
+                clue: 'Kegiatan ini berfungsi mencatat kejadian penting agar terdokumentasi secara tertib dan legal sesuai aturan hukum usaha.',
+                explanation: 'Berdasarkan Halaman 3 materi PDF pada bagian Faktor Administrasi: Untuk menunjang kelancaran, sebaiknya wirausaha mempunyai catatan rapi mengenai kegiatan harian secara kronologis.'
+            },
+            {
+                id: 17, type: 'mcq', level: 'C2', materi: 'Perencanaan Usaha',
+                kisi: 'Mengidentifikasi kegiatan perencanaan usaha',
+                question: 'Langkah awal untuk memulai usaha seperti merencanakan produk apa yang dibuat, menghitung dana, dan merencanakan jumlah produk disebut sebagai fungsi...',
+                options: ['Pengendalian produk', 'Perencanaan usaha', 'Evaluasi manajemen', 'Pemasaran massal', 'Uji kelayakan lingkungan'],
+                answer: 1,
+                clue: 'Fungsi ini dikerjakan paling awal sebelum bisnis berjalan guna menghindari kegagalan mendadak.',
+                explanation: 'Berdasarkan Halaman 2 materi PDF pada bagian Faktor Perencanaan: Perencanaan usaha dimulai dari merencanakan produk, memperhitungkan dana, jumlah produk, dan tempat pemasaran.'
+            },
+            {
+                id: 18, type: 'mcq', level: 'C2', materi: 'Pemasaran',
+                kisi: 'Mengidentifikasi kegiatan pemasaran usaha',
+                question: 'Kegiatan untuk mengetahui daya serap pasar, kondisi prospek pasar, serta menyusun program penjualan termasuk dalam lingkup kegiatan...',
+                options: ['Faktor Pemasaran', 'Faktor Administrasi', 'Faktor Keuangan', 'Faktor Produksi', 'Faktor Organisasi'],
+                answer: 0,
+                clue: 'Kegiatan ini ditujukan agar produk yang diproduksi dapat terdistribusi dan dibeli oleh konsumen sasaran.',
+                explanation: 'Berdasarkan Halaman 3 materi PDF pada bagian Faktor Pemasaran: Meliputi daya serap pasar, kondisi pemasaran, dan program pemasaran.'
+            },
+            {
+                id: 19, type: 'mcq', level: 'C4', materi: 'Pemasaran',
+                kisi: 'Menganalisis faktor pemasaran usaha',
+                question: 'Agar produk kerajinan akar bambu dapat bersaing dan laris di pasaran, analisis terpenting dalam faktor pemasaran yang harus dilakukan wirausahawan adalah...',
+                options: [
+                'Meningkatkan harga jual setinggi-tingginya',
+                'Menyesuaikan produk dengan selera dan daya beli konsumen target sasaran',
+                'Memproduksi barang sebanyak-banyaknya tanpa melihat tren',
+                'Menghilangkan pengemasan untuk menghemat biaya',
+                'Merekrut banyak akuntan untuk mencatat keuangan'
+                ],
+                answer: 1,
+                clue: 'Fokus pemasaran adalah kepuasan pelanggan serta keterjangkauan harga produk di mata target konsumen setempat.',
+                explanation: 'Berdasarkan Halaman 4 materi PDF: Keberhasilan usaha ditentukan oleh kemampuan menguasai pasar melalui produk bermutu, harga sesuai, dan sesuai selera serta daya beli konsumen.'
+            },
+            {
+                id: 20, type: 'mcq', level: 'C2', materi: 'Kewirausahaan',
+                kisi: 'Mengidentifikasi faktor utama keberhasilan usaha',
+                question: 'Faktor yang merupakan ujung tombak utama pencapaian keberhasilan usaha karena memiliki ide, etos kerja tinggi, dan optimisme adalah faktor...',
+                options: ['Money (Uang)', 'Material (Bahan)', 'Machine (Mesin)', 'Man (Manusia)', 'Market (Pasar)'],
+                answer: 3,
+                clue: 'Sumber daya ini yang merancang, menjalankan, dan mengevaluasi seluruh perputaran roda usaha.',
+                explanation: 'Berdasarkan Halaman 2 materi PDF pada bagian Faktor Manusia: Faktor manusia merupakan faktor yang utama karena manusia yang memiliki ide, rencana, dan mewujudkannya.'
+            },
+            {
+                id: 21, type: 'mcq', level: 'C2', materi: 'Perencanaan Usaha',
+                kisi: 'Mengidentifikasi kegiatan perencanaan usaha',
+                question: 'Menetapkan balas jasa (gaji), menyusun struktur organisasi, dan membuat jadwal usaha termasuk kegiatan wirausahawan dalam hal...',
+                options: ['Faktor mengatur usaha', 'Faktor pemasaran', 'Mengurus IMB', 'Menetapkan retribusi pasar', 'Promosi media sosial'],
+                answer: 0,
+                clue: 'Kegiatan ini mengatur tata laksana internal perusahaan agar hubungan antar-karyawan berjalan tertib dan terstruktur.',
+                explanation: 'Berdasarkan Halaman 2 & 3 materi PDF pada bagian Faktor Mengatur Usaha: Wirausaha melakukan penyusunan tugas pokok, struktur organisasi, jadwal usaha, dan penataan administrasi.'
+            },
+            {
+                id: 22, type: 'mcq', level: 'C1', materi: 'Perizinan Usaha',
+                kisi: 'Menjelaskan kepanjangan SITU',
+                question: 'Dalam mengurus administrasi perizinan usaha di pemerintah daerah, kepanjangan dari singkatan SITU adalah...',
+                options: [
+                'Syarat Izin Tata Usaha',
+                'Surat Izin Tempat Usaha',
+                'Surat Instruksi Teknik Usaha',
+                'Sentra Izin Terpadu Usaha',
+                'Surat Izin Transaksi Usaha'
+                ],
+                answer: 1,
+                clue: 'Izin ini berkaitan dengan keabsahan lokasi fisik atau tempat berdirinya operasional usaha agar terbebas dari masalah lingkungan sekitar.',
+                explanation: 'Berdasarkan Halaman 3 materi PDF pada bagian Mengurus Izin Usaha: Surat Izin Usaha, antara lain Surat Izin Tempat Usaha (SITU).'
+            },
+            {
+                id: 23, type: 'mcq', level: 'C1', materi: 'Perizinan Usaha',
+                kisi: 'Menjelaskan kepanjangan NPWP',
+                question: 'Dokumen perpajakan yang wajib dimiliki oleh badan usaha maupun pengusaha individu adalah NPWP. Kepanjangan NPWP adalah...',
+                options: [
+                'Nomor Pendaftaran Wajib Pajak',
+                'Nilai Pajak Wajib Pengusaha',
+                'Nomor Pokok Wajib Pajak',
+                'Nomor Pokok Warga Pajak',
+                'Nomor Pengusaha Wajib Pajak'
+                ],
+                answer: 2,
+                clue: 'Merupakan identitas wajib pajak bagi wajib pajak untuk menjaga ketertiban administrasi perpajakan.',
+                explanation: 'Berdasarkan Halaman 3 materi PDF pada bagian Pengurusan Pajak: Wajib pajak mendapatkan NPWP (Nomor Pokok Wajib Pajak).'
+            },
+            {
+                id: 24, type: 'mcq', level: 'C2', materi: 'Perizinan Usaha',
+                kisi: 'Mengidentifikasi dokumen legalitas usaha',
+                question: 'Surat izin yang diberikan oleh menteri atau pejabat yang ditunjuk kepada pengusaha untuk melaksanakan kegiatan usaha di bidang perdagangan disebut...',
+                options: ['SITU', 'HO (Hinder Ordonnantie)', 'NPWP', 'SIUP (Surat Izin Usaha Perdagangan)', 'TDP'],
+                answer: 3,
+                clue: 'Sesuai namanya, izin ini khusus ditujukan untuk kegiatan transaksi jual beli (perdagangan) barang atau jasa.',
+                explanation: 'Berdasarkan Halaman 3 materi PDF pada bagian Surat Izin Usaha Perdagangan (SIUP): SIUP diberikan oleh menteri/pejabat ditunjuk untuk usaha di bidang perdagangan/jasa.'
+            },
+            {
+                id: 25, type: 'mcq', level: 'C4', materi: 'Perizinan Usaha',
+                kisi: 'Menganalisis fungsi AMDAL',
+                question: 'Usaha yang menghasilkan limbah atau berdampak pada kelestarian alam wajib memiliki dokumen AMDAL. Analisis fungsi utama AMDAL adalah...',
+                options: [
+                'Mengawasi dan mengkaji dampak aktivitas usaha agar tidak merusak keseimbangan ekosistem lingkungan',
+                'Menetapkan besaran tarif pajak pertambahan nilai suatu produk',
+                'Mengurus pendaftaran merek dagang agar tidak ditiru kompetitor',
+                'Melindungi pekerja dari risiko kecelakaan kerja',
+                'Sebagai syarat mendapatkan kredit bantuan perbankan'
+                ],
+                answer: 0,
+                clue: 'AMDAL merupakan singkatan dari Analisis Mengenai Dampak Lingkungan hidup.',
+                explanation: 'Berdasarkan Halaman 3 materi PDF: AMDAL adalah studi mengenai akibat pada lingkungan sebagai akibat aktivitas kegiatan usaha agar tidak mengganggu ekosistem alam.'
+            },
+            {
+                id: 26, type: 'mcq', level: 'C4', materi: 'Perizinan Usaha',
+                kisi: 'Menganalisis hubungan TDP dengan legalitas usaha',
+                question: 'Setelah memiliki SIUP dan NPWP, pengusaha mendaftar untuk mendapatkan TDP (Tanda Daftar Perusahaan). Hubungan kepemilikan TDP dengan legalitas bisnis tersebut adalah...',
+                options: [
+                'Perusahaan terbebas dari segala macam pajak seumur hidup',
+                'Perusahaan dapat secara monopoli menguasai pasar bahan baku lokal',
+                'Bukti resmi bahwa perusahaan telah teregistrasi sah dan diakui keberadaannya oleh pemerintah',
+                'Sebagai jaminan bahwa usaha tidak akan pernah mengalami kerugian (bangkrut)',
+                'Menggantikan fungsi sertifikat tanah lokasi usaha'
+                ],
+                answer: 2,
+                clue: 'TDP mencatat pendaftaran badan usaha secara resmi di dinas terkait sebagai bukti keterbukaan informasi perusahaan.',
+                explanation: 'Berdasarkan Halaman 3 materi PDF pada bagian Tanda Daftar Perusahaan (TDP): Merupakan pencatatan pendaftaran badan usaha secara resmi oleh Deperindag setempat.'
+            },
+            {
+                id: 27, type: 'mcq', level: 'C2', materi: 'Pemasaran',
+                kisi: 'Mengidentifikasi tujuan survei pasar',
+                question: 'Tujuan utama melakukan riset atau menetapkan sasaran pasar sebelum menjalankan promosi adalah untuk...',
+                options: [
+                'Menentukan pabrik supplier bahan kimia yang paling mahal',
+                'Mengetahui siapa calon pembeli, daya beli, dan selera konsumen yang dituju',
+                'Merekrut tenaga ahli dari luar negeri',
+                'Mendapatkan izin mendirikan bangunan dari perangkat desa',
+                'Mencari celah untuk tidak membayar pajak daerah'
+                ],
+                answer: 1,
+                clue: 'Survei pasar membantu wirausaha agar produk yang dijual sesuai dengan minat, tren, serta kesanggupan keuangan pembeli.',
+                explanation: 'Berdasarkan Halaman 4 materi PDF: Pemasaran berhasil jika memahami sasaran pasar dan selera konsumen.'
+            },
+            {
+                id: 28, type: 'mcq', level: 'C2', materi: 'Promosi',
+                kisi: 'Mengidentifikasi promosi melalui media sosial',
+                question: 'Memanfaatkan aplikasi seperti Instagram, Facebook, dan WhatsApp untuk menampilkan katalog foto produk kerajinan limbah merupakan bentuk pemanfaatan pemasaran melalui...',
+                options: ['Penjualan tatap muka (Personal Selling)', 'Iklan cetak koran', 'Media sosial dan internet', 'Promosi dari mulut ke mulut', 'Sponsorship olahraga'],
+                answer: 2,
+                clue: 'Merupakan metode promosi modern yang dijalankan secara online tanpa dibatasi jarak ruang geografis.',
+                explanation: 'Berdasarkan Halaman 7 materi PDF pada bagian b: Memanfaatkan media sosial dan internet (Facebook, Instagram, WhatsApp) membantu memperluas pemasaran produk.'
+            },
+            {
+                id: 29, type: 'mcq', level: 'C2', materi: 'Promosi',
+                kisi: 'Mengidentifikasi strategi sales promotion',
+                question: 'Memberikan diskon (potongan harga), kupon undian, atau sampel barang gratis kepada konsumen dengan tujuan merangsang pembelian secara cepat merupakan jenis promosi...',
+                options: ['Publisitas massal', 'Sales Promotion (Promosi Penjualan)', 'Advertising (Periklanan)', 'Public Relation (Humas)', 'Branding korporat'],
+                answer: 1,
+                clue: 'Merupakan teknik insentif jangka pendek yang dirancang agar calon pembeli tidak menunda transaksi mereka saat itu juga.',
+                explanation: 'Berdasarkan Halaman 7 materi PDF pada bagian b: Promosi Penjualan (Sales Promotion) dilakukan dengan diskon, kupon, bonus, dan sampel produk agar cepat dibeli.'
+            },
+            {
+                id: 30, type: 'mcq', level: 'C2', materi: 'Promosi',
+                kisi: 'Mengidentifikasi sponsorship produk',
+                question: 'Perusahaan pengrajin limbah turut mendanai kegiatan pentas seni budaya di sebuah SMA, kemudian logo usahanya dipasang di spanduk acara. Bentuk promosi ini disebut...',
+                options: ['Personal Selling', 'Bazar obral', 'Direct marketing', 'Sponsorship', 'Media cetak lokal'],
+                answer: 3,
+                clue: 'Melibatkan pendanaan acara komunitas atau pihak eksternal agar merek dagang terpasang sebagai bentuk promosi timbal balik.',
+                explanation: 'Berdasarkan Halaman 4 & 7 materi PDF: Sponsorship adalah promosi dengan mengaitkan produk atau merek pada kegiatan pihak lain.'
+            },
+            {
+                id: 31, type: 'mcq', level: 'C2', materi: 'Kerajinan',
+                kisi: 'Mengidentifikasi faktor kualitas kerajinan',
+                question: 'Kualitas karya kerajinan limbah berbentuk bangun ruang sangat ditentukan oleh beberapa faktor utama, yaitu...',
+                options: [
+                'Lokasi pabrik, warna kemasan, dan jumlah tenaga penjualan',
+                'Kualitas bahan, teknik pengerjaan, desain, nilai fungsi, dan nilai estetika',
+                'Modal bank, harga bahan, dan diskon',
+                'Izin SIUP, TDP, NPWP, dan SITU',
+                'Jumlah like di Instagram dan pengikut di media sosial'
+                ],
+                answer: 1,
+                clue: 'Kualitas produk kerajinan menggabungkan keelokan visual, kerapian cara merakit, kekuatan bahan dasar, serta kegunaan barang itu sendiri.',
+                explanation: 'Berdasarkan Halaman 5 materi PDF pada bagian Proses Produksi: Kualitas ditentukan oleh Kualitas bahan, teknik pengerjaan, desain, nilai fungsi, dan nilai estetika.'
+            },
+            {
+                id: 32, type: 'mcq', level: 'C4', materi: 'Kerajinan',
+                kisi: 'Menganalisis penggunaan teknik ukir',
+                question: 'Apabila seorang pengrajin ingin membuat kotak hiasan yang memiliki motif relief/timbul pada permukaan limbah bongkahan kayu jati, teknik produksi yang paling tepat dianalisis untuk digunakan adalah...',
+                options: ['Teknik anyam', 'Teknik cor/cetak', 'Teknik ukir/pahat', 'Teknik las listrik', 'Teknik bubut'],
+                answer: 2,
+                clue: 'Teknik ini menggunakan pahat khusus untuk mengurangi volume kayu secara bertahap sehingga membentuk relief seni hias.',
+                explanation: 'Berdasarkan Halaman 5 materi PDF: Pada pengolahan bahan kayu, teknik ukir/pahat sangat umum digunakan untuk membuat karya dekoratif.'
+            },
+            {
+                id: 33, type: 'mcq', level: 'C2', materi: 'Produk Kerajinan',
+                kisi: 'Mengidentifikasi fungsi benda pakai',
+                question: 'Kursi dan meja yang dibuat dari susunan ban bekas dan kayu palet menonjolkan fungsi utamanya sebagai tempat duduk dan menaruh barang. Hal ini mencerminkan manfaat kerajinan sebagai...',
+                options: ['Benda pusaka', 'Benda koleksi', 'Benda magis', 'Benda pakai', 'Benda hias/pajangan semata'],
+                answer: 3,
+                clue: 'Fungsi utama produk ditekankan untuk membantu kehidupan praktis jasmani atau fisik sehari-hari manusia.',
+                explanation: 'Berdasarkan Halaman 4 materi PDF: Manfaat Produk Kerajinan sebagai Benda Pakai mengutamakan fungsinya, sedangkan unsur keindahan hanyalah pendukung.'
+            },
+            {
+                id: 34, type: 'mcq', level: 'C4', materi: 'Produk Kerajinan',
+                kisi: 'Menganalisis kenyamanan penggunaan produk',
+                question: 'Meskipun tas dari limbah tempurung kelapa terlihat unik, pengrajin harus memastikan sudut-sudutnya dihaluskan agar tidak melukai kulit pemakainya. Analisis tersebut berkaitan dengan unsur...',
+                options: ['Unsur estetika (keindahan)', 'Unsur ergonomis (kenyamanan dan keamanan)', 'Unsur ekonomis (harga murah)', 'Unsur publisitas (kelayakan promosi)', 'Unsur kelangkaan bahan'],
+                answer: 1,
+                clue: 'Aspek ergonomis mencakup kenyamanan, keselarasan bentuk dengan fungsi tubuh, dan jaminan keamanan saat bersentuhan langsung dengan pengguna.',
+                explanation: 'Berdasarkan Halaman 5 materi PDF pada aspek Nilai Fungsi: Mempertimbangkan kenyamanan dan keamanan dalam penggunaan produk kerajinan (ergonomis).'
+            },
+            {
+                id: 35, type: 'mcq', level: 'C4', materi: 'Kerajinan Limbah',
+                kisi: 'Menganalisis pengaruh karakteristik bahan',
+                question: 'Limbah kaca (seperti botol kaca pecah) memiliki karakteristik keras, tembus pandang, namun mudah pecah kembali. Analisis pengolahan teknik yang tepat untuk menjadikannya karya seni bernilai tinggi adalah...',
+                options: [
+                'Dipotong dengan gunting kertas dan direkatkan dengan lem kayu',
+                'Dilebur menggunakan teknik pemanasan bersuhu tinggi untuk dicetak ulang atau dilem khusus kaca',
+                'Dianyam menyilang seperti membuat tikar',
+                'Dipahat menggunakan palu dan pahat kayu untuk membentuk ukiran',
+                'Direndam dalam air kapur selama sebulan agar menjadi lunak'
+                ],
+                answer: 1,
+                clue: 'Kaca merupakan bahan sintetis padat yang hanya bisa diubah bentuk dasar strukturnya melalui proses peleburan panas api ekstrem.',
+                explanation: 'Berdasarkan Halaman 4 materi PDF: Kerajinan botol kaca memiliki warna beragam dan dapat diolah menjadi produk bernilai tinggi dengan teknik pemanasan.'
+            },
+            {
+                id: 36, type: 'mcq', level: 'C2', materi: 'Kemasan Produk',
+                kisi: 'Mengidentifikasi fungsi estetika kemasan',
+                question: 'Selain melindungi barang, kemasan produk kerajinan sering ditambahkan pita warna-warni, desain kotak transparan, atau tipografi huruf yang elegan. Hal ini merupakan perwujudan dari kemasan dalam fungsi...',
+                options: ['Fungsi protektif', 'Fungsi informatif', 'Fungsi distribusi', 'Fungsi estetika (menambah keindahan)', 'Fungsi daur ulang sekunder'],
+                answer: 3,
+                clue: 'Fungsi ini berkaitan langsung dengan keindahan visual luar agar produk menarik minat pandangan mata calon konsumen.',
+                explanation: 'Berdasarkan Halaman 6 materi PDF pada bagian Fungsi Pengemasan: Fungsi Estetika membuat produk terlihat indah, cantik, dan menarik di mata pembeli.'
+            },
+            {
+                id: 37, type: 'mcq', level: 'C4', materi: 'Kemasan Produk',
+                kisi: 'Menganalisis pengaruh kemasan terhadap pemasaran',
+                question: 'Dua buah kerajinan bros dari tulang ikan memiliki kualitas yang sama. Produk A dikemas dalam plastik kresek bening biasa, produk B dikemas dalam kotak karton kecil bertuliskan merek dan desain unik. Analisis dampak strategi B terhadap pemasaran adalah...',
+                options: [
+                'Produk B akan lebih sulit didistribusikan karena memakan tempat',
+                'Produk B dapat meningkatkan nilai jual (harga lebih tinggi) dan daya saing yang memikat minat konsumen',
+                'Produk B merugikan perusahaan karena biaya kemasan melebihi modal bahan',
+                'Produk A akan terlihat jauh lebih eksklusif dan higienis dibanding B',
+                'Tidak ada pengaruh yang signifikan bagi konsumen antara kemasan A dan B'
+                ],
+                answer: 1,
+                clue: 'Kemasan yang profesional memberi kesan eksklusif, rapi, bernilai tinggi, dan menjaga kebersihan barang.',
+                explanation: 'Berdasarkan Halaman 6 materi PDF pada bagian Tujuan Pengemasan: Kemasan yang menarik meningkatkan nilai jual dan menambah kepercayaan konsumen terhadap produk.'
+            },
+            {
+                id: 38, type: 'mcq', level: 'C4', materi: 'Promosi Digital',
+                kisi: 'Menganalisis tujuan promosi media sosial',
+                question: 'Mengapa wirausahawan kerajinan di era sekarang sangat disarankan memanfaatkan promosi media sosial seperti Tiktok/Instagram dibandingkan hanya mengandalkan brosur cetak?',
+                options: [
+                'Karena mencetak brosur tidak memerlukan biaya desain sama sekali',
+                'Karena media sosial mampu memperluas pemasaran, menjangkau audiens secara global dengan biaya lebih terjangkau',
+                'Karena pemerintah melarang secara total pemasaran offline',
+                'Karena produk kerajinan limbah tidak boleh dijual secara fisik di toko',
+                'Karena media sosial tidak membutuhkan koneksi internet bagi penjual'
+                ],
+                answer: 1,
+                clue: 'Media sosial memiliki jangkauan tanpa batas wilayah, murah, serta didukung visualisasi foto/video yang menarik minat audiens luas.',
+                explanation: 'Berdasarkan Halaman 7 materi PDF pada bagian b: Memanfaatkan media sosial dan internet membantu memperluas pemasaran secara efisien dan hemat biaya.'
+            },
+            {
+                id: 39, type: 'mcq', level: 'C2', materi: 'Pemasaran',
+                kisi: 'Mengidentifikasi strategi pemasaran lokal',
+                question: 'Memperkenalkan dan menitipkan produk vas bunga dari limbah botol plastik di koperasi sekolah atau warung tetangga merupakan bentuk penerapan strategi...',
+                options: ['Penjualan ekspor antaranegara', 'Memasarkan di lingkungan sekitar (Lokal)', 'Promosi publisitas massa', 'Pemasaran Business to Business (B2B)', 'Penjualan hak paten (Franchise)'],
+                answer: 1,
+                clue: 'Merupakan area terdekat dari lokasi wirausahawan tinggal, mudah dipantau, dan ongkos kirimnya nol.',
+                explanation: 'Berdasarkan Halaman 7 materi PDF pada bagian a: Memasarkan di lingkungan sekitar (guru, tetangga, teman, koperasi sekolah, warung setempat) merupakan strategi lokal awal.'
+            },
+            {
+                id: 40, type: 'mcq', level: 'C4', materi: 'Promosi',
+                kisi: 'Menganalisis strategi promosi sesuai konsumen',
+                question: 'Pengrajin memproduksi kerajinan patung kayu eksklusif berseni tinggi dari sisa akar jati dengan harga jutaan rupiah. Strategi promosi yang paling relevan dengan target pasar kalangan menengah ke atas adalah...',
+                options: [
+                'Menggelar lapak pinggir jalan saat pasar kaget mingguan',
+                'Menjual produk secara obral buy 1 get 5 di grup Whatsapp keluarga',
+                'Mengikuti pameran seni rupa berkelas (Art Exhibition) di galeri terkemuka',
+                'Menyebarkan fotokopi brosur hitam putih di lampu merah',
+                'Memberikan produk tersebut secara cuma-cuma sebagai doorprize lomba RT'
+                ],
+                answer: 2,
+                clue: 'Konsumen kalangan kolektor dan menengah ke atas cenderung mengunjungi tempat apresiasi seni formal, pameran elite, atau galeri kurasi.',
+                explanation: 'Berdasarkan Halaman 4 & 7 materi PDF: Strategi pemasaran dan promosi harus sesuai dengan selera konsumen sasaran serta eksklusivitas citra produk.'
+            },
+
+            // --- ESSAY 41-45 ---
+            {
+                id: 41, type: 'essay', level: 'C2', materi: 'Peluang Usaha',
+                kisi: 'Menjelaskan faktor-faktor usaha kerajinan',
+                question: 'Sebutkan dan jelaskan secara singkat 3 tipe sumber daya yang menjadi faktor pendukung keberhasilan produksi usaha kerajinan bahan limbah (diambil dari unsur 6M)!',
+                clue: 'Pilih 3 dari 6 unsur berikut: Man (Manusia), Money (Uang/Modal), Material (Bahan), Machine (Mesin), Method (Metode), atau Market (Pasar), lalu terangkan fungsinya.',
+                explanation: 'Berdasarkan Halaman 2 materi PDF:\n1. Man (Manusia): Sumber utama pembawa ide, rencana, etos kerja tinggi.\n2. Money (Keuangan): Digunakan sebagai modal pembelian bahan baku, gaji, promosi.\n3. Material (Bahan): Ketersediaan bahan utama untuk menjamin kelancaran produksi.'
+            },
+            {
+                id: 42, type: 'essay', level: 'C6', materi: 'Produk Kerajinan',
+                kisi: 'Membuat rancangan produk kerajinan limbah bangun ruang',
+                question: 'Ciptakan/buatlah 1 ide rancangan produk kerajinan dari bahan limbah berbentuk bangun ruang. Uraikan:\na. Apa nama produknya?\nb. Jenis limbah apa yang dipakai?\nc. Termasuk benda pakai atau benda hias?',
+                clue: 'Pilihlah salah satu limbah bangun ruang (botol plastik, ban bekas, kaleng, tempurung kelapa). Rancang produk baru yang fungsional atau estetis.',
+                explanation: 'Berdasarkan Halaman 4 & 5 materi PDF:\nContoh rancangan valid:\na. Nama Produk: Lampu hias meja estetik\nb. Limbah: Tempurung kelapa (batok) bekas\nc. Kategori: Benda hias (karena menonjolkan keindahan pendaran cahaya).'
+            },
+            {
+                id: 43, type: 'essay', level: 'C4', materi: 'SWOT',
+                kisi: 'Membuat analisis SWOT produk kerajinan',
+                question: 'Berdasarkan ide produk yang Anda rancang di nomor 42, buatlah analisis SWOT sederhana (1 Kekuatan/Strength dan 1 Kelemahan/Weakness) dari produk tersebut!',
+                clue: 'Kekuatan berasal dari keunikan internal produk Anda. Kelemahan adalah keterbatasan internal (misalnya pengerjaan manual yang lama).',
+                explanation: 'Berdasarkan Halaman 2 materi PDF:\n- Strength (Kekuatan): Bahan batok kelapa murah/melimpah, memiliki serat kayu alami unik.\n- Weakness (Kelemahan): Pengerjaan memotong dan mengamplas butuh waktu lama karena manual.'
+            },
+            {
+                id: 44, type: 'essay', level: 'C6', materi: 'Kemasan dan Pemasaran',
+                kisi: 'Membuat rancangan kemasan dan strategi pemasaran',
+                question: 'Sebagai pengusaha kerajinan miniatur dari limbah kaleng bekas, rancanglah bentuk kemasan yang aman untuk produk Anda dan sebutkan 1 media promosi apa yang paling efektif Anda gunakan!',
+                clue: 'Kaleng bekas rawan penyok dan tajam. Pilihlah kemasan yang melindunginya dengan baik. Gunakan media promosi modern.',
+                explanation: 'Berdasarkan Halaman 5 & 7 materi PDF:\n- Kemasan: Kotak karton tebal/box duplex dengan bantalan kertas serut agar miniatur tidak guncang/rusak.\n- Promosi: Pemanfaatan media sosial Instagram/TikTok dengan konten video proses pembuatan kreatif (DIY).'
+            },
+            {
+                id: 45, type: 'essay', level: 'C2', materi: 'Kerajinan Limbah',
+                kisi: 'Menjelaskan manfaat kerajinan limbah dan contohnya',
+                question: 'Jelaskan perbedaan produk kerajinan sebagai "Benda Pakai" dan "Benda Hias", lalu berikan masing-masing 1 contoh produknya yang terbuat dari limbah bangun ruang!',
+                clue: 'Benda pakai fokus pada kegunaan aktivitas, benda hias fokus pada unsur pajangan/keindahan visual semata.',
+                explanation: 'Berdasarkan Halaman 4 & 5 materi PDF:\n- Benda Pakai: Mengutamakan fungsi praktisnya. Contoh: Pot tanaman dari ban bekas / botol plastik.\n- Benda Hias: Lebih menonjolkan keindahan daripada fungsi pakai. Contoh: Miniatur kapal dari limbah logam / kaleng.'
+            }
+        ];
+
+        function App() {
+            const [currentIdx, setCurrentIdx] = useState(0);
+            const [answers, setAnswers] = useState({}); 
+            const [graded, setGraded] = useState({}); 
+            const [showClue, setShowClue] = useState({});
+            const [scoreView, setScoreView] = useState(false);
+
+            const handleOptionSelect = (qId, optionIdx) => {
+                if (graded[qId]) return; 
+                setAnswers(prev => ({ ...prev, [qId]: optionIdx }));
+            };
+
+            const handleEssayInput = (qId, text) => {
+                if (graded[qId]) return;
+                setAnswers(prev => ({ ...prev, [qId]: text }));
+            };
+
+            const toggleClue = (qId) => {
+                setShowClue(prev => ({ ...prev, [qId]: !prev[qId] }));
+            };
+
+            const handleGrading = (qId) => {
+                if (answers[qId] === undefined || answers[qId] === '') {
+                    alert('Silakan pilih atau isi jawaban terlebih dahulu sebelum mengoreksi.');
+                    return;
+                }
+                setGraded(prev => ({ ...prev, [qId]: true }));
+            };
+
+            const calculateScore = () => {
+                let correct = 0;
+                let totalMCQ = 40; // Pasti 40 soal
+                
+                QUESTIONS.forEach(q => {
+                    if (q.type === 'mcq' && graded[q.id] && answers[q.id] === q.answer) {
+                        correct++;
+                    }
+                });
+                return { correct, score: Math.round((correct / totalMCQ) * 100) || 0, totalMCQ };
+            };
+
+            const resetExam = () => {
+                if (window.confirm('Apakah Anda ingin mengulang seluruh simulasi dari awal? Semua progres akan hilang.')) {
+                    setAnswers({});
+                    setGraded({});
+                    setShowClue({});
+                    setCurrentIdx(0);
+                    setScoreView(false);
+                }
+            };
+
+            const q = QUESTIONS[currentIdx];
+            const isEssay = q.type === 'essay';
+            const { correct, score, totalMCQ } = calculateScore();
+            const totalAnswered = Object.keys(answers).length;
+
+            return (
+                <div className="min-h-screen flex flex-col antialiased">
+                    
+                    {/* HEADER PAPER-THEME */}
+                    <header className="bg-[#FBFaf8] border-b border-[#E0DDD4] sticky top-0 z-20 px-4 py-3.5 sm:px-8 flex flex-wrap justify-between items-center gap-4">
+                        <div className="flex items-center gap-3">
+                            <div className="text-[#899481]">
+                                <IconLeaf />
+                            </div>
+                            <div>
+                                <h1 className="font-semibold text-[#413F39] text-sm sm:text-base flex items-center gap-2">
+                                    Simulasi Ujian PKWU 
+                                    <span className="text-[10px] bg-[#F2F4F0] text-[#737C6C] px-2 py-0.5 rounded border border-[#DCE0D9] tracking-widest font-bold">FOKUS MODE</span>
+                                </h1>
+                                <p className="text-xs text-[#8C8981] mt-0.5">SMAN 1 Belitang • Semester Genap 2025/2026</p>
+                            </div>
+                        </div>
+                    </header>
+
+                    <div className="flex-1 flex flex-col lg:flex-row overflow-hidden max-w-7xl mx-auto w-full">
+                        
+                        {/* PANEL KIRI: AREA UTAMA SOAL */}
+                        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-10 flex flex-col">
+                            <div className="w-full max-w-3xl mx-auto space-y-8">
+                                
+                                {/* PROGRESS BAR SOFT */}
+                                <div className="space-y-2">
+                                    <div className="flex justify-between items-center text-[11px] uppercase tracking-wider font-semibold text-[#8C8981]">
+                                        <span>Progres Belajar</span>
+                                        <span className="text-[#413F39]">
+                                            {totalAnswered} / {QUESTIONS.length}
+                                        </span>
+                                    </div>
+                                    <div className="h-1.5 w-full bg-[#E0DDD4] rounded-full overflow-hidden">
+                                        <div 
+                                            className="h-full bg-[#899481] transition-all duration-500 ease-out rounded-full"
+                                            style={{ width: `${(totalAnswered / QUESTIONS.length) * 100}%` }}
+                                        ></div>
+                                    </div>
+                                </div>
+
+                                {/* CARD SOAL */}
+                                <div className="bg-[#FBFaf8] rounded-xl border border-[#E0DDD4] p-6 sm:p-10 shadow-sm relative transition-all duration-300">
+                                    
+                                    <div className="flex flex-wrap items-center gap-2 mb-6">
+                                        <span className="text-[10px] font-bold text-[#737C6C] bg-[#F2F4F0] px-3 py-1 rounded-sm border border-[#DCE0D9] uppercase tracking-wider">
+                                            {q.materi}
+                                        </span>
+                                        <span className="text-[10px] font-bold text-[#8C8981] border border-[#E0DDD4] px-3 py-1 rounded-sm uppercase tracking-wider">
+                                            Level {q.level}
+                                        </span>
+                                    </div>
+
+                                    {/* PERTANYAAN DENGAN FONT SERIF */}
+                                    <div className="flex gap-4 mb-8 items-start">
+                                        <div className="text-[#8C8981] font-serif font-bold text-lg pt-1 shrink-0 w-6">
+                                            {q.id}.
+                                        </div>
+                                        <h2 className="text-[1.05rem] sm:text-[1.15rem] font-serif font-medium text-[#413F39] leading-relaxed pt-1">
+                                            {q.question}
+                                        </h2>
+                                    </div>
+
+                                    {/* OPSI JAWABAN (DESAIN SUBTLE/HALUS) */}
+                                    <div className="space-y-3 ml-10 pl-0">
+                                        {isEssay ? (
+                                            <textarea 
+                                                className="w-full bg-[#EFECE5] text-[#413F39] border border-[#E0DDD4] rounded-md p-4 focus:border-[#899481] focus:ring-1 focus:ring-[#899481] outline-none transition resize-y min-h-[160px] text-sm leading-relaxed"
+                                                placeholder="Ketik jawaban urain Anda secara rinci..."
+                                                value={answers[q.id] || ''}
+                                                onChange={(e) => handleEssayInput(q.id, e.target.value)}
+                                                disabled={graded[q.id]}
+                                            />
+                                        ) : (
+                                            q.options.map((opt, idx) => {
+                                                const isSelected = answers[q.id] === idx;
+                                                const isGraded = graded[q.id];
+                                                const isCorrectAnswer = idx === q.answer;
+
+                                                // LOGIKA PEWARNAAN YANG SANGAT HALUS (Sesuai Permintaan)
+                                                let boxClass = "bg-[#FBFaf8] border-[#E0DDD4] text-[#413F39] hover:bg-[#F2F4F0]";
+                                                let labelClass = "text-[#8C8981]";
+
+                                                if (!isGraded) {
+                                                    if (isSelected) {
+                                                        boxClass = "bg-[#F2F4F0] border-[#899481] text-[#2C2B27]"; // Sage light
+                                                        labelClass = "text-[#737C6C] font-bold";
+                                                    }
+                                                } else {
+                                                    if (isSelected && isCorrectAnswer) {
+                                                        boxClass = "bg-[#F0F5F0] border-[#8FA68F] text-[#2C2B27]"; // Hijau kalem
+                                                        labelClass = "text-[#5B705B] font-bold";
+                                                    } else if (isSelected && !isCorrectAnswer) {
+                                                        boxClass = "bg-[#FAF0F0] border-[#C49797] text-[#422C2C]"; // Merah bata pucat
+                                                        labelClass = "text-[#9E6E6E] font-bold";
+                                                    } else if (!isSelected && isCorrectAnswer) {
+                                                        // Jawaban yang benar tetapi tidak dipilih
+                                                        boxClass = "bg-transparent border-[#8FA68F] border-dashed text-[#5B705B]";
+                                                    } else {
+                                                        // Jawaban lain yang salah dan tidak dipilih
+                                                        boxClass = "bg-transparent border-[#E0DDD4] text-[#A3A096] opacity-60";
+                                                    }
+                                                }
+
+                                                return (
+                                                    <button
+                                                        key={idx}
+                                                        onClick={() => handleOptionSelect(q.id, idx)}
+                                                        disabled={isGraded}
+                                                        className={`w-full text-left p-3.5 rounded-md border transition duration-200 flex gap-4 items-start ${boxClass} ${isGraded ? 'cursor-default' : 'cursor-pointer'}`}
+                                                    >
+                                                        <div className={`mt-0.5 text-sm transition-colors ${labelClass}`}>
+                                                            {String.fromCharCode(65 + idx)}.
+                                                        </div>
+                                                        <span className="text-sm leading-relaxed">{opt}</span>
+                                                    </button>
+                                                )
+                                            })
+                                        )}
+                                    </div>
+
+                                    {/* PEMBAHASAN MUNCUL SETELAH KOREKSI */}
+                                    {graded[q.id] && (
+                                        <div className="mt-8 pt-6 border-t border-[#E0DDD4] fade-in">
+                                            <div className="flex gap-2 items-center mb-3 text-[11px] uppercase tracking-widest font-bold text-[#8C8981]">
+                                                Kunci Pembahasan
+                                            </div>
+                                            <div className="p-4 bg-[#EFECE5] rounded-md text-sm text-[#413F39] leading-relaxed whitespace-pre-line border border-[#E0DDD4]">
+                                                {q.explanation}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* TOMBOL AKSI: PETUNJUK & KOREKSI */}
+                                    <div className="mt-8 pt-6 border-t border-[#E0DDD4] flex flex-wrap gap-3">
+                                        <button
+                                            onClick={() => toggleClue(q.id)}
+                                            className="flex items-center gap-1.5 px-4 py-2 rounded text-xs font-semibold text-[#737C6C] bg-transparent border border-[#DCE0D9] hover:bg-[#F2F4F0] transition"
+                                        >
+                                            <IconHelp /> {showClue[q.id] ? 'Tutup Petunjuk' : 'Petunjuk Logika'}
+                                        </button>
+
+                                        {!graded[q.id] && (
+                                            <button
+                                                onClick={() => handleGrading(q.id)}
+                                                className="flex items-center gap-1.5 px-5 py-2 rounded text-xs font-semibold text-white bg-[#899481] hover:bg-[#737C6C] transition shadow-sm ml-auto"
+                                            >
+                                                Koreksi Jawaban
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {/* KOTAK PETUNJUK */}
+                                    {showClue[q.id] && !graded[q.id] && (
+                                        <div className="mt-4 p-4 bg-[#FBFaf8] border border-dashed border-[#DCE0D9] rounded-md flex gap-3 text-sm text-[#413F39] fade-in">
+                                            <span className="text-[#899481] text-lg">✦</span>
+                                            <div className="leading-relaxed">
+                                                {q.clue}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* NAVIGASI BAWAH */}
+                                <div className="flex justify-between items-center py-2">
+                                    <button
+                                        disabled={currentIdx === 0}
+                                        onClick={() => setCurrentIdx(c => Math.max(0, c - 1))}
+                                        className="flex items-center gap-2 text-[11px] uppercase font-bold tracking-wider text-[#8C8981] hover:text-[#413F39] disabled:opacity-30 px-3 py-2 transition"
+                                    >
+                                        <IconChevronLeft /> Sebelum
+                                    </button>
+
+                                    <button 
+                                        onClick={() => setScoreView(true)}
+                                        className="text-[11px] uppercase font-bold tracking-wider text-[#737C6C] hover:text-[#413F39] border-b border-[#DCE0D9] hover:border-[#737C6C] transition pb-0.5"
+                                    >
+                                        Lihat Rekap
+                                    </button>
+
+                                    <button
+                                        disabled={currentIdx === QUESTIONS.length - 1}
+                                        onClick={() => setCurrentIdx(c => Math.min(QUESTIONS.length - 1, c + 1))}
+                                        className="flex items-center gap-2 text-[11px] uppercase font-bold tracking-wider text-[#8C8981] hover:text-[#413F39] disabled:opacity-30 px-3 py-2 transition"
+                                    >
+                                        Lanjut <IconChevronRight />
+                                    </button>
+                                </div>
+                            </div>
+                        </main>
+
+                        {/* PANEL KANAN: NAVIGASI GRID (MINIMALIS) */}
+                        <aside className="w-full lg:w-[300px] bg-[#FBFaf8] border-t lg:border-t-0 lg:border-l border-[#E0DDD4] p-6 flex flex-col shrink-0 lg:h-[calc(100vh-60px)] overflow-y-auto">
+                            <div className="mb-8">
+                                <h3 className="font-semibold text-[#413F39] text-sm mb-1">Indikator Pengerjaan</h3>
+                                <p className="text-xs text-[#8C8981]">Lompat ke nomor soal spesifik.</p>
+                            </div>
+
+                            {/* GRID PILIHAN GANDA */}
+                            <div className="mb-8">
+                                <h4 className="text-[10px] font-bold text-[#8C8981] uppercase tracking-widest mb-3 border-b border-[#E0DDD4] pb-2">Pilihan Ganda</h4>
+                                <div className="grid grid-cols-5 gap-2.5">
+                                    {QUESTIONS.filter(q => q.type === 'mcq').map((item, idx) => {
+                                        const isAnswered = answers[item.id] !== undefined;
+                                        const isGraded = graded[item.id];
+                                        const isCorrect = isGraded && answers[item.id] === item.answer;
+                                        const isCurrent = currentIdx === QUESTIONS.findIndex(q => q.id === item.id);
+                                        
+                                        let btnClass = "h-8 rounded-[4px] text-[11px] font-semibold border flex items-center justify-center transition-colors ";
+                                        
+                                        if (isCurrent) {
+                                            btnClass += "ring-2 ring-[#899481] ring-offset-1 ring-offset-[#FBFaf8] ";
+                                        }
+
+                                        if (isGraded) {
+                                            btnClass += isCorrect 
+                                                ? "bg-[#8FA68F] text-white border-[#8FA68F]" 
+                                                : "bg-[#C49797] text-white border-[#C49797]";
+                                        } else if (isAnswered) {
+                                            btnClass += "bg-[#F2F4F0] text-[#737C6C] border-[#DCE0D9]";
+                                        } else {
+                                            btnClass += "bg-transparent text-[#A3A096] border-[#E0DDD4] hover:bg-[#EFECE5]";
+                                        }
+
+                                        return (
+                                            <button 
+                                                key={item.id}
+                                                onClick={() => setCurrentIdx(QUESTIONS.findIndex(q => q.id === item.id))}
+                                                className={btnClass}
+                                            >
+                                                {item.id}
+                                            </button>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* GRID ESSAY */}
+                            <div className="mb-auto">
+                                <h4 className="text-[10px] font-bold text-[#8C8981] uppercase tracking-widest mb-3 border-b border-[#E0DDD4] pb-2">Uraian</h4>
+                                <div className="grid grid-cols-5 gap-2.5">
+                                    {QUESTIONS.filter(q => q.type === 'essay').map((item, idx) => {
+                                        const isAnswered = answers[item.id] !== undefined && answers[item.id].trim() !== '';
+                                        const isGraded = graded[item.id];
+                                        const isCurrent = currentIdx === QUESTIONS.findIndex(q => q.id === item.id);
+                                        
+                                        let btnClass = "h-8 rounded-[4px] text-[11px] font-semibold border flex items-center justify-center transition-colors ";
+                                        
+                                        if (isCurrent) {
+                                            btnClass += "ring-2 ring-[#899481] ring-offset-1 ring-offset-[#FBFaf8] ";
+                                        }
+
+                                        if (isGraded) {
+                                            btnClass += "bg-[#737C6C] text-white border-[#737C6C]"; 
+                                        } else if (isAnswered) {
+                                            btnClass += "bg-[#F2F4F0] text-[#737C6C] border-[#DCE0D9]";
+                                        } else {
+                                            btnClass += "bg-transparent text-[#A3A096] border-[#E0DDD4] hover:bg-[#EFECE5]";
+                                        }
+
+                                        return (
+                                            <button 
+                                                key={item.id}
+                                                onClick={() => setCurrentIdx(QUESTIONS.findIndex(q => q.id === item.id))}
+                                                className={btnClass}
+                                            >
+                                                {item.id}
+                                            </button>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+
+                            <div className="pt-6 mt-6">
+                                <button
+                                    onClick={resetExam}
+                                    className="w-full flex items-center justify-center gap-2 bg-transparent border border-[#E0DDD4] text-[#8C8981] hover:text-[#413F39] hover:bg-[#EFECE5] font-semibold text-[11px] py-3 rounded uppercase tracking-wider transition"
+                                >
+                                    <IconRefresh /> Ulangi Sesi
+                                </button>
+                            </div>
+                        </aside>
+                    </div>
+
+                    {/* MODAL REKAPITULASI */}
+                    {scoreView && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#413F39]/40 backdrop-blur-sm fade-in">
+                            <div className="bg-[#FBFaf8] border border-[#E0DDD4] p-8 rounded-lg max-w-sm w-full text-center space-y-6 shadow-2xl">
+                                
+                                <div>
+                                    <h2 className="text-xl font-serif font-bold text-[#413F39]">Rekapitulasi Belajar</h2>
+                                    <p className="text-[#8C8981] text-xs mt-1">Hanya opsi yang telah dikoreksi yang masuk perhitungan.</p>
+                                </div>
+
+                                <div className="bg-[#EFECE5] p-6 rounded-md border border-[#E0DDD4]">
+                                    <span className="text-[10px] font-bold text-[#8C8981] uppercase tracking-widest">Akurasi Pilihan Ganda</span>
+                                    <div className="text-5xl font-serif font-bold text-[#737C6C] mt-2 mb-2">
+                                        {score} <span className="text-lg text-[#8C8981] font-medium font-sans">/ 100</span>
+                                    </div>
+                                    <p className="text-xs text-[#8C8981]">
+                                        Benar <strong className="text-[#413F39]">{correct}</strong> dari <strong className="text-[#413F39]">{totalMCQ}</strong> PG
+                                    </p>
+                                </div>
+
+                                <div className="text-xs text-[#8C8981] text-left leading-relaxed">
+                                    Soal uraian dinilai mandiri menggunakan kunci rubrik. Harap sesuaikan poin Anda secara deskriptif.
+                                </div>
+
+                                <div className="pt-2">
+                                    <button
+                                        onClick={() => setScoreView(false)}
+                                        className="w-full bg-[#899481] hover:bg-[#737C6C] text-white font-semibold text-xs py-3 rounded-md uppercase tracking-wider transition"
+                                    >
+                                        Tutup Rekap
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
